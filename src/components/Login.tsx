@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User } from '../App';
-import { Building2, Heart, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { authAPI } from '../services/api';
 
 interface LoginProps {
@@ -31,11 +31,11 @@ export default function Login({ onLogin }: LoginProps) {
 
       // TEMP user object (until /auth/me API is added)
       onLogin({
-        id: 1,
+        id: '1',
         name: 'Admin',
         email,
-        role: 'ADMIN', // must match frontend role type
-      });
+        role: 'super_admin', // must match frontend role type
+      } as User);
 
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed');
