@@ -1,5 +1,5 @@
 import axios from 'axios';
-
+import { authService } from './auth';
 // API Base URL - Change this to your backend URL when ready
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -17,26 +17,34 @@ const apiClient = axios.create({
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('authToken');
+    const token = authService.getToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 // Response interceptor for error handling
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Handle 401 Unauthorized (token expired or invalid)
     if (error.response?.status === 401) {
-      // Unauthorized - clear token and redirect to login
-      localStorage.removeItem('authToken');
-      window.location.href = '/';
+      console.warn("401 Unauthorized");
     }
+    
+    // Handle 403 Forbidden (insufficient permissions)
+    if (error.response?.status === 403) {
+      console.warn("Access forbidden - insufficient permissions");
+    }
+    
+    // Handle 500+ Server errors
+    if (error.response?.status >= 500) {
+      console.error("Server error:", error.response?.status);
+    }
+    
     return Promise.reject(error);
   }
 );
@@ -45,19 +53,11 @@ apiClient.interceptors.response.use(
 // AUTHENTICATION APIs
 // ============================================
 
+
 export const authAPI = {
-  // POST /auth/login
-  // Body: { email: string, password: string }
-  // Response: { token: string, user: User }
   login: (email: string, password: string) =>
     apiClient.post('/auth/login', { email, password }),
 
-  // POST /auth/logout
-  logout: () =>
-    apiClient.post('/auth/logout'),
-
-  // GET /auth/me
-  // Response: { user: User }
   getCurrentUser: () =>
     apiClient.get('/auth/me'),
 };
@@ -67,24 +67,12 @@ export const authAPI = {
 // ============================================
 
 export const dashboardAPI = {
-  // GET /dashboard/stats
-  // Response: { totalApproved, totalUtilized, remainingBalance, activeAppeals, etc. }
-  getStats: () =>
-    apiClient.get('/dashboard/stats'),
-
-  // GET /dashboard/donation-trend?period=6months
+  getStats: () => apiClient.get('/dashboard/stats'),
   getDonationTrend: (period = '6months') =>
     apiClient.get('/dashboard/donation-trend', { params: { period } }),
-
-  // GET /dashboard/appeal-status
-  getAppealStatus: () =>
-    apiClient.get('/dashboard/appeal-status'),
-
-  // GET /dashboard/recent-activity?limit=5
+  getAppealStatus: () => apiClient.get('/dashboard/appeal-status'),
   getRecentActivity: (limit = 5) =>
     apiClient.get('/dashboard/recent-activity', { params: { limit } }),
-
-  // GET /dashboard/pending-approvals
   getPendingApprovals: () =>
     apiClient.get('/dashboard/pending-approvals'),
 };
@@ -94,33 +82,12 @@ export const dashboardAPI = {
 // ============================================
 
 export const appealAPI = {
-  // GET /appeals?status=all&search=&page=1&limit=10
-  getAppeals: (params: { status?: string; search?: string; page?: number; limit?: number }) =>
-    apiClient.get('/appeals', { params }),
-
-  // GET /appeals/:id
-  getAppealById: (id: string) =>
-    apiClient.get(`/appeals/${id}`),
-
-  // POST /appeals
-  // Body: { title, purpose, estimatedAmount, beneficiaryCategory, duration, documents }
-  createAppeal: (data: any) =>
-    apiClient.post('/appeals', data),
-
-  // PUT /appeals/:id
-  updateAppeal: (id: string, data: any) =>
-    apiClient.put(`/appeals/${id}`, data),
-
-  // DELETE /appeals/:id
-  deleteAppeal: (id: string) =>
-    apiClient.delete(`/appeals/${id}`),
-
-  // POST /appeals/:id/submit
-  submitAppeal: (id: string) =>
-    apiClient.post(`/appeals/${id}/submit`),
-
-  // POST /appeals/:id/documents
-  // Body: FormData with file
+  getAppeals: (params: any) => apiClient.get('/appeals', { params }),
+  getAppealById: (id: string) => apiClient.get(`/appeals/${id}`),
+  createAppeal: (data: any) => apiClient.post('/appeals', data),
+  updateAppeal: (id: string, data: any) => apiClient.put(`/appeals/${id}`, data),
+  deleteAppeal: (id: string) => apiClient.delete(`/appeals/${id}`),
+  submitAppeal: (id: string) => apiClient.post(`/appeals/${id}/submit`),
   uploadDocument: (id: string, formData: FormData) =>
     apiClient.post(`/appeals/${id}/documents`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },

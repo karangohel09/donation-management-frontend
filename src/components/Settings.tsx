@@ -1,3 +1,5 @@
+import { settingsAPI } from '../services/api';
+import { useEffect } from 'react';
 import React, { useState } from 'react';
 import { User } from '../App';
 import { Users, Shield, Eye, Edit, Plus, CheckCircle, XCircle, Key, Bell, Settings as SettingsIcon } from 'lucide-react';
@@ -14,49 +16,6 @@ interface SystemUser {
   status: 'active' | 'inactive';
   lastLogin: string;
 }
-
-const mockUsers: SystemUser[] = [
-  {
-    id: '1',
-    name: 'Rajesh Kumar',
-    email: 'rajesh@itc.com',
-    role: 'Super Admin',
-    status: 'active',
-    lastLogin: '2024-12-28 09:30 AM',
-  },
-  {
-    id: '2',
-    name: 'Priya Sharma',
-    email: 'priya@itc.com',
-    role: 'ITC Admin',
-    status: 'active',
-    lastLogin: '2024-12-28 08:15 AM',
-  },
-  {
-    id: '3',
-    name: 'Swami Anand',
-    email: 'swami@anoopam.org',
-    role: 'Mission Authority',
-    status: 'active',
-    lastLogin: '2024-12-27 05:45 PM',
-  },
-  {
-    id: '4',
-    name: 'Amit Patel',
-    email: 'amit@accounts.com',
-    role: 'Accounts User',
-    status: 'active',
-    lastLogin: '2024-12-28 10:00 AM',
-  },
-  {
-    id: '5',
-    name: 'Guest User',
-    email: 'viewer@itc.com',
-    role: 'Viewer',
-    status: 'inactive',
-    lastLogin: '2024-12-20 03:20 PM',
-  },
-];
 
 const rolePermissions = {
   'Super Admin': {
@@ -119,7 +78,41 @@ const rolePermissions = {
 export default function Settings({ user }: SettingsProps) {
   const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'general'>('users');
   const [showAddUserModal, setShowAddUserModal] = useState(false);
-  const [users, setUsers] = useState<SystemUser[]>(mockUsers);
+  const [users, setUsers] = useState<SystemUser[]>([]);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState('');
+  const [password, setPassword] = useState('');
+
+
+  useEffect(() => {
+  loadUsers();
+          }, []);
+
+const loadUsers = async () => {
+  try {
+    const res = await settingsAPI.getUsers();
+    setUsers(res.data);
+  } catch (err) {
+    console.error("Failed to load users", err);
+  }
+};
+const createUser = async () => {
+  try {
+    await settingsAPI.addUser({
+      name,
+      email,
+      password,
+      role
+    });
+
+    setShowAddUserModal(false);
+    loadUsers();   // reload users from database
+  } catch (err) {
+    alert("Failed to create user");
+    console.error(err);
+  }
+};
 
   return (
     <div className="space-y-6">
@@ -431,14 +424,14 @@ export default function Settings({ user }: SettingsProps) {
                   <label className="block text-gray-700 mb-2">Full Name *</label>
                   <input
                     type="text"
-                    placeholder="Enter full name"
+                    placeholder="Enter full name" onChange={e => setName(e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
                 </div>
                 <div>
                   <label className="block text-gray-700 mb-2">Email Address *</label>
                   <input
-                    type="email"
+                    type="email" onChange={e => setEmail(e.target.value)}
                     placeholder="user@email.com"
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
@@ -447,20 +440,20 @@ export default function Settings({ user }: SettingsProps) {
 
               <div>
                 <label className="block text-gray-700 mb-2">Role *</label>
-                <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                <select onChange={e => setRole(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
                   <option value="">Select a role</option>
-                  <option value="super_admin">Super Admin</option>
-                  <option value="itc_admin">ITC Admin</option>
-                  <option value="mission_authority">Mission Authority</option>
-                  <option value="accounts_user">Accounts User</option>
-                  <option value="viewer">Viewer</option>
+                  <option value="SUPER_ADMIN">Super Admin</option>
+                  <option value="ITC_ADMIN">ITC Admin</option>
+                  <option value="MISSION_ADMIN">Mission Authority</option>
+                  <option value="FINANCE_ADMIN">Accounts User</option>
+                  <option value="VIEWER">Viewer</option>
                 </select>
               </div>
 
               <div>
                 <label className="block text-gray-700 mb-2">Initial Password *</label>
                 <input
-                  type="password"
+                  type="password"  onChange={e => setPassword(e.target.value)}
                   placeholder="Enter temporary password"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
@@ -475,7 +468,7 @@ export default function Settings({ user }: SettingsProps) {
                   Cancel
                 </button>
                 <button
-                  onClick={() => setShowAddUserModal(false)}
+                  onClick={createUser}
                   className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                 >
                   Add User

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { User } from '../App';
 import { Loader2 } from 'lucide-react';
 import { authAPI } from '../services/api';
+import { authService } from '../services/auth';
 
 interface LoginProps {
   onLogin: (user: User) => void;
@@ -14,35 +15,43 @@ export default function Login({ onLogin }: LoginProps) {
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+  e.preventDefault();
+  setError("");
+  setLoading(true);
 
-    try {
-      const response = await authAPI.login(email, password);
+  try {
+    // 1️⃣ Login → get token
+    const loginRes = await authAPI.login(email, password);
+    const token = loginRes.data.token;
 
-      if (!response?.data?.token) {
-        setError('Invalid email or password');
-        return;
-      }
+    if (!token) throw new Error("No token");
 
-      const token = response.data.token;
-      localStorage.setItem('authToken', token);
+    authService.setToken(token);
 
-      // TEMP user object (until /auth/me API is added)
-      onLogin({
-        id: '1',
-        name: 'Admin',
-        email,
-        role: 'super_admin', // must match frontend role type
-      } as User);
+    // 2️⃣ Get REAL logged-in user from backend
+    const meRes = await authAPI.getCurrentUser();
 
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed');
-    } finally {
-      setLoading(false);
-    }
-  };
+    const user: User = {
+      id: meRes.data.id,
+      name: meRes.data.name,
+      email: meRes.data.email,
+      role: meRes.data.role.toLowerCase()
+    };
+
+    // 3️⃣ Clear previous session and save new one
+    authService.clearAuth();
+    authService.setToken(token);
+    authService.setUser(user);
+
+    onLogin(user);
+  } catch (err) {
+    authService.clearAuth();
+    setError("Invalid email or password");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center p-4">

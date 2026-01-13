@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import AppealManagement from './components/AppealManagement';
@@ -11,6 +11,8 @@ import BeneficiaryManagement from './components/BeneficiaryManagement';
 import Reports from './components/Reports';
 import Settings from './components/Settings';
 import Navigation from './components/Navigation';
+import { authAPI } from './services/api';
+import { authService } from './services/auth';
 
 export type UserRole = 'super_admin' | 'itc_admin' | 'mission_authority' | 'accounts_user' | 'viewer';
 
@@ -26,6 +28,38 @@ function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activePage, setActivePage] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Check for valid token on app load
+  useEffect(() => {
+  const restore = async () => {
+    const token = authService.getToken();
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const me = await authAPI.getCurrentUser();
+      const user = {
+        id: me.data.id,
+        name: me.data.name,
+        email: me.data.email,
+        role: me.data.role.toLowerCase()
+      };
+
+      authService.setUser(user);
+      setCurrentUser(user);
+      setIsAuthenticated(true);
+    } catch {
+      authService.clearAuth();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  restore();
+}, []);
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
@@ -34,10 +68,10 @@ function App() {
   };
 
   const handleLogout = () => {
+    authService.logout();
     setCurrentUser(null);
     setIsAuthenticated(false);
     setActivePage('dashboard');
-    localStorage.removeItem('authToken');
   };
 
   const handlePageChange = (page: string) => {
@@ -45,6 +79,14 @@ function App() {
     setIsMobileMenuOpen(false); // Close mobile menu on page change
   };
 
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-600">Loading...</div>
+      </div>
+    );
+  }
   if (!isAuthenticated) {
     return <Login onLogin={handleLogin} />;
   }
@@ -96,3 +138,4 @@ function App() {
 }
 
 export default App;
+
