@@ -1,6 +1,6 @@
 // services/auth.ts
 
-import jwtDecode from "jwt-decode";
+import { jwtDecode } from "jwt-decode";
 
 const TOKEN_KEY = "authToken";
 const USER_KEY = "authUser";

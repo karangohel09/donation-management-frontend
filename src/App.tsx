@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import AppealManagement from './components/AppealManagement';
@@ -14,7 +15,7 @@ import Navigation from './components/Navigation';
 import { authAPI } from './services/api';
 import { authService } from './services/auth';
 
-export type UserRole = 'super_admin' | 'itc_admin' | 'mission_authority' | 'accounts_user' | 'viewer';
+export type UserRole = 'SUPER_ADMIN' | 'ITC_ADMIN' | 'MISSION_ADMIN' | 'FINANCE_ADMIN' | 'VIEWER';
 
 export interface User {
   id: string;
@@ -26,56 +27,102 @@ export interface User {
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [activePage, setActivePage] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Map URL path to page ID
+  const getPageIdFromPath = () => {
+    const path = location.pathname.replace('/', '');
+    if (!path || path === '') return 'dashboard';
+    return path;
+  };
+
+  const activePage = getPageIdFromPath();
 
   // Check for valid token on app load
   useEffect(() => {
-  const restore = async () => {
-    const token = authService.getToken();
-    if (!token) {
-      setIsLoading(false);
-      return;
-    }
+    const restore = async () => {
+      const token = authService.getToken();
+      const storedUser = authService.getUser();
 
-    try {
-      const me = await authAPI.getCurrentUser();
-      const user = {
-        id: me.data.id,
-        name: me.data.name,
-        email: me.data.email,
-        role: me.data.role.toLowerCase()
-      };
+      // If we have a stored user and valid token, use it without verifying
+      if (storedUser && token && authService.isTokenValid()) {
+        setCurrentUser(storedUser);
+        setIsAuthenticated(true);
+        setIsLoading(false);
+        return;
+      }
 
-      authService.setUser(user);
-      setCurrentUser(user);
-      setIsAuthenticated(true);
-    } catch {
-      authService.clearAuth();
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      // If no token, user is not authenticated
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
 
-  restore();
-}, []);
+      // If token exists but is invalid, clear it
+      if (!authService.isTokenValid()) {
+        console.warn("Token is expired or invalid");
+        authService.clearAuth();
+        setCurrentUser(null);
+        setIsAuthenticated(false);
+        setIsLoading(false);
+        return;
+      }
+
+      // Try to verify with backend as a fallback
+      try {
+        const me = await authAPI.getCurrentUser();
+        
+        if (!me.data.id || !me.data.email) {
+          throw new Error("Invalid user data");
+        }
+
+        const user = {
+          id: me.data.id,
+          name: me.data.name || "",
+          email: me.data.email,
+          role: (me.data.role || "VIEWER") as any
+        };
+
+        authService.setUser(user);
+        setCurrentUser(user);
+        setIsAuthenticated(true);
+      } catch (error: any) {
+        console.error("Failed to verify session with backend:", error?.response?.status, error?.message);
+        // If backend verification fails, still use stored user if available (graceful degradation)
+        if (storedUser) {
+          setCurrentUser(storedUser);
+          setIsAuthenticated(true);
+        } else {
+          authService.clearAuth();
+          setCurrentUser(null);
+          setIsAuthenticated(false);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    restore();
+  }, []);
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
     setIsAuthenticated(true);
-    setActivePage('dashboard');
+    navigate('/dashboard');
   };
 
   const handleLogout = () => {
     authService.logout();
     setCurrentUser(null);
     setIsAuthenticated(false);
-    setActivePage('dashboard');
+    navigate('/login');
   };
 
   const handlePageChange = (page: string) => {
-    setActivePage(page);
+    navigate(`/${page}`);
     setIsMobileMenuOpen(false); // Close mobile menu on page change
   };
 
@@ -87,36 +134,13 @@ function App() {
       </div>
     );
   }
-  if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} />;
-  }
 
-  const renderPage = () => {
-    switch (activePage) {
-      case 'dashboard':
-        return <Dashboard user={currentUser!} />;
-      case 'appeals':
-        return <AppealManagement user={currentUser!} />;
-      case 'approvals':
-        return <ApprovalWorkflow user={currentUser!} />;
-      case 'communication':
-        return <DonorCommunication user={currentUser!} />;
-      case 'donations':
-        return <DonationReceipt user={currentUser!} />;
-      case 'utilization':
-        return <FundUtilization user={currentUser!} />;
-      case 'assets':
-        return <AssetReference user={currentUser!} />;
-      case 'beneficiaries':
-        return <BeneficiaryManagement user={currentUser!} />;
-      case 'reports':
-        return <Reports user={currentUser!} />;
-      case 'settings':
-        return <Settings user={currentUser!} />;
-      default:
-        return <Dashboard user={currentUser!} />;
-    }
-  };
+  if (!isAuthenticated) {
+    return <Routes>
+      <Route path="/login" element={<Login onLogin={handleLogin} />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -130,7 +154,20 @@ function App() {
       />
       <main className="lg:ml-64 min-h-screen">
         <div className="p-4 sm:p-6 lg:p-8">
-          {renderPage()}
+          <Routes>
+            <Route path="/dashboard" element={<Dashboard user={currentUser!} />} />
+            <Route path="/appeals" element={<AppealManagement user={currentUser!} />} />
+            <Route path="/approvals" element={<ApprovalWorkflow user={currentUser!} />} />
+            <Route path="/communication" element={<DonorCommunication user={currentUser!} />} />
+            <Route path="/donations" element={<DonationReceipt user={currentUser!} />} />
+            <Route path="/utilization" element={<FundUtilization user={currentUser!} />} />
+            <Route path="/assets" element={<AssetReference user={currentUser!} />} />
+            <Route path="/beneficiaries" element={<BeneficiaryManagement user={currentUser!} />} />
+            <Route path="/reports" element={<Reports user={currentUser!} />} />
+            <Route path="/settings" element={<Settings user={currentUser!} />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
         </div>
       </main>
     </div>

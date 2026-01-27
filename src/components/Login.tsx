@@ -20,33 +20,55 @@ export default function Login({ onLogin }: LoginProps) {
   setLoading(true);
 
   try {
-    // 1️⃣ Login → get token
+    // 1️⃣ Clear any previous session first
+    authService.clearAuth();
+
+    // 2️⃣ Login → get token
+    console.log("Attempting login with:", email);
     const loginRes = await authAPI.login(email, password);
     const token = loginRes.data.token;
+    
+    console.log("Login response received:", {
+      hasToken: !!token,
+      tokenPreview: token ? token.substring(0, 30) + '...' : 'NO TOKEN'
+    });
 
-    if (!token) throw new Error("No token");
+    if (!token) throw new Error("No token received from server");
 
+    // 3️⃣ Save token BEFORE making authenticated requests
     authService.setToken(token);
+    console.log("Token saved to localStorage");
 
-    // 2️⃣ Get REAL logged-in user from backend
-    const meRes = await authAPI.getCurrentUser();
+    // 4️⃣ Get REAL logged-in user from backend (requires valid token)
+    let meRes;
+    try {
+      console.log("Fetching current user...");
+      meRes = await authAPI.getCurrentUser();
+      console.log("Current user fetched:", meRes.data);
+    } catch (err) {
+      console.error("Failed to fetch current user:", err);
+      throw new Error("Failed to fetch user information");
+    }
+
+    if (!meRes.data.id || !meRes.data.email) {
+      throw new Error("Invalid user data from server");
+    }
 
     const user: User = {
       id: meRes.data.id,
-      name: meRes.data.name,
+      name: meRes.data.name || "",
       email: meRes.data.email,
-      role: meRes.data.role.toLowerCase()
+      role: meRes.data.role as any
     };
 
-    // 3️⃣ Clear previous session and save new one
-    authService.clearAuth();
-    authService.setToken(token);
+    // 5️⃣ Save user to localStorage
     authService.setUser(user);
 
     onLogin(user);
-  } catch (err) {
+  } catch (err: any) {
     authService.clearAuth();
-    setError("Invalid email or password");
+    console.error("Login error:", err);
+    setError(err.response?.data?.message || err.message || "Invalid email or password");
   } finally {
     setLoading(false);
   }
@@ -87,13 +109,15 @@ export default function Login({ onLogin }: LoginProps) {
             />
 
             {error && (
-              <div className="text-red-600 text-sm">{error}</div>
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
+                {error}
+              </div>
             )}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-green-600 text-white py-2 rounded"
+              className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <Loader2 className="animate-spin mx-auto" />

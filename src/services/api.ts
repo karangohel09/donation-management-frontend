@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { authService } from './auth';
-// API Base URL - Change this to your backend URL when ready
+// API Base URL - Use Vite proxy to avoid CORS issues
 const API_BASE_URL =
-  import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  import.meta.env.VITE_API_URL || '/api';
 
 
 // Create axios instance with default config
@@ -30,19 +30,49 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    const token = authService.getToken();
+    // Log all errors for debugging
+    console.error("API Error:", {
+      status: error.response?.status,
+      url: error.config?.url,
+      method: error.config?.method,
+      message: error.message,
+      data: error.response?.data,
+      hasToken: !!token,
+      tokenPreview: token ? token.substring(0, 20) + '...' : 'NO TOKEN',
+      authHeader: error.config?.headers?.Authorization ? 'YES' : 'NO',
+    });
+
     // Handle 401 Unauthorized (token expired or invalid)
     if (error.response?.status === 401) {
-      console.warn("401 Unauthorized");
+      console.warn("401 Unauthorized - Token expired or invalid");
+      console.warn("Clearing auth and redirecting to login");
+      authService.clearAuth();
+      // Optionally redirect to login
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
     }
     
     // Handle 403 Forbidden (insufficient permissions)
     if (error.response?.status === 403) {
-      console.warn("Access forbidden - insufficient permissions");
+      console.warn("403 Forbidden - Access denied (insufficient permissions)");
+      console.warn("Response:", error.response?.data);
+    }
+    
+    // Handle 404 Not Found
+    if (error.response?.status === 404) {
+      console.warn("404 Not Found - Endpoint does not exist", error.config?.url);
     }
     
     // Handle 500+ Server errors
     if (error.response?.status >= 500) {
       console.error("Server error:", error.response?.status);
+    }
+    
+    // Handle network errors (no backend)
+    if (error.message === "Network Error" && !error.response) {
+      console.error("Network Error - Cannot reach backend. Make sure backend is running on", API_BASE_URL);
     }
     
     return Promise.reject(error);

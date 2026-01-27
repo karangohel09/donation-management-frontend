@@ -28,24 +28,24 @@ interface NavigationProps {
 }
 
 const menuItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['super_admin', 'itc_admin', 'mission_authority', 'accounts_user', 'viewer'] },
-  { id: 'appeals', label: 'Appeal Management', icon: FileText, roles: ['super_admin', 'itc_admin', 'mission_authority', 'viewer'] },
-  { id: 'approvals', label: 'Approval Workflow', icon: CheckCircle, roles: ['super_admin', 'mission_authority'] },
-  { id: 'communication', label: 'Donor Communication', icon: MessageSquare, roles: ['super_admin', 'itc_admin', 'viewer'] },
-  { id: 'donations', label: 'Donation Receipt', icon: Receipt, roles: ['super_admin', 'itc_admin', 'accounts_user', 'viewer'] },
-  { id: 'utilization', label: 'Fund Utilization', icon: TrendingUp, roles: ['super_admin', 'itc_admin', 'accounts_user', 'viewer'] },
-  { id: 'assets', label: 'Asset Reference', icon: Package, roles: ['super_admin', 'itc_admin', 'accounts_user', 'viewer'] },
-  { id: 'beneficiaries', label: 'Beneficiary Management', icon: Users, roles: ['super_admin', 'itc_admin', 'viewer'] },
-  { id: 'reports', label: 'Reports & Analytics', icon: BarChart3, roles: ['super_admin', 'itc_admin', 'mission_authority', 'accounts_user', 'viewer'] },
-  { id: 'settings', label: 'Settings', icon: Settings, roles: ['super_admin', 'itc_admin'] },
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['SUPER_ADMIN', 'ITC_ADMIN', 'MISSION_ADMIN', 'FINANCE_ADMIN', 'VIEWER'] },
+  { id: 'appeals', label: 'Appeal Management', icon: FileText, roles: ['SUPER_ADMIN', 'ITC_ADMIN', 'MISSION_ADMIN'] },
+  { id: 'approvals', label: 'Approval Workflow', icon: CheckCircle, roles: ['SUPER_ADMIN', 'MISSION_ADMIN', 'FINANCE_ADMIN'] },
+  { id: 'communication', label: 'Donor Communication', icon: MessageSquare, roles: ['SUPER_ADMIN', 'ITC_ADMIN'] },
+  { id: 'donations', label: 'Donation Receipt', icon: Receipt, roles: ['SUPER_ADMIN', 'ITC_ADMIN', 'FINANCE_ADMIN'] },
+  { id: 'utilization', label: 'Fund Utilization', icon: TrendingUp, roles: ['SUPER_ADMIN', 'ITC_ADMIN', 'FINANCE_ADMIN'] },
+  { id: 'assets', label: 'Asset Reference', icon: Package, roles: ['SUPER_ADMIN', 'ITC_ADMIN', 'FINANCE_ADMIN'] },
+  { id: 'beneficiaries', label: 'Beneficiary Management', icon: Users, roles: ['SUPER_ADMIN', 'ITC_ADMIN'] },
+  { id: 'reports', label: 'Reports & Analytics', icon: BarChart3, roles: ['SUPER_ADMIN', 'ITC_ADMIN', 'MISSION_ADMIN', 'FINANCE_ADMIN'] },
+  { id: 'settings', label: 'Settings', icon: Settings, roles: ['SUPER_ADMIN'] },
 ];
 
 const roleLabels = {
-  super_admin: 'Super Admin',
-  itc_admin: 'ITC Admin',
-  mission_authority: 'Mission Authority',
-  accounts_user: 'Accounts User',
-  viewer: 'Viewer',
+  SUPER_ADMIN: 'Super Admin',
+  ITC_ADMIN: 'ITC Admin',
+  MISSION_ADMIN: 'Mission Authority',
+  FINANCE_ADMIN: 'Finance Admin',
+  VIEWER: 'Viewer',
 };
 
 export default function Navigation({ user, activePage, onPageChange, onLogout, isMobileMenuOpen, setIsMobileMenuOpen }: NavigationProps) {
