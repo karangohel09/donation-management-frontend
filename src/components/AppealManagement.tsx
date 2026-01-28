@@ -116,16 +116,20 @@ export default function AppealManagement({ user }: AppealManagementProps) {
 
       const response = await appealAPI.createAppeal(payload);
       const appealId = response.data.id;
+      console.log('Appeal created with ID:', appealId);
       
       // Upload files if any were selected
       if (uploadedFiles.length > 0 && appealId) {
+        console.log('Starting document uploads, file count:', uploadedFiles.length);
         for (const file of uploadedFiles) {
           const formDataWithFile = new FormData();
           formDataWithFile.append('file', file);
           try {
-            await appealAPI.uploadDocument(appealId.toString(), formDataWithFile);
+            console.log('Uploading file:', file.name, 'to appeal:', appealId);
+            const uploadResponse = await appealAPI.uploadDocument(appealId.toString(), formDataWithFile);
+            console.log('File uploaded successfully:', file.name, 'Response:', uploadResponse);
           } catch (err) {
-            console.error('Failed to upload document:', err);
+            console.error('Failed to upload document:', file.name, err);
           }
         }
       }
@@ -187,36 +191,34 @@ export default function AppealManagement({ user }: AppealManagementProps) {
     // Fetch documents for this appeal
     setLoadingDocuments(true);
     try {
-      console.log('Fetching documents for appeal:', appeal.id);
-      const response = await appealAPI.getAppealById(appeal.id);
-      console.log('Appeal details response:', response.data);
+      console.log('Fetching documents for appeal ID:', appeal.id);
       
-      // Try to get documents from response
-      let docs = response.data.documents || [];
-      console.log('Documents from getAppealById:', docs);
+      // Use the proper API method to fetch documents
+      const docsResponse = await appealAPI.getAppealDocuments(appeal.id);
+      console.log('Full documents response:', docsResponse);
+      console.log('Documents response data:', docsResponse.data);
+      console.log('Documents data type:', typeof docsResponse.data);
+      console.log('Documents data is array?', Array.isArray(docsResponse.data));
       
-      // If no documents in main response, try to fetch separately
-      if (!docs || docs.length === 0) {
-        try {
-          console.log('Fetching documents separately from /appeals/{id}/documents');
-          // This assumes you have an endpoint to get documents
-          const docsResponse = await fetch(`/api/appeals/${appeal.id}/documents`, {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-            }
-          });
-          if (docsResponse.ok) {
-            docs = await docsResponse.json();
-            console.log('Documents from separate endpoint:', docs);
-          }
-        } catch (err) {
-          console.log('No separate documents endpoint, using documents from appeal details');
-        }
+      // Handle both array and object responses
+      let docs = [];
+      if (Array.isArray(docsResponse.data)) {
+        docs = docsResponse.data;
+      } else if (docsResponse.data) {
+        docs = docsResponse.data.documents || [];
       }
+      
+      console.log('Processed documents:', docs);
+      console.log('Number of documents:', docs.length);
       
       setAppealDocuments(docs);
     } catch (err: any) {
-      console.error('Failed to fetch documents:', err);
+      console.error('Failed to fetch documents - Error details:', {
+        message: err.message,
+        status: err.response?.status,
+        data: err.response?.data,
+        url: err.config?.url
+      });
       setAppealDocuments([]);
     } finally {
       setLoadingDocuments(false);

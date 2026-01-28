@@ -1,108 +1,138 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from '../App';
-import { CheckCircle, XCircle, Clock, FileText, Calendar, DollarSign, User as UserIcon, MessageSquare } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, FileText, Calendar, DollarSign, User as UserIcon, MessageSquare, AlertCircle } from 'lucide-react';
+import { approvalAPI } from '../services/api';
 
 interface ApprovalWorkflowProps {
   user: User;
 }
 
 interface PendingAppeal {
-  id: string;
+  id: number;
   title: string;
-  purpose: string;
-  requestedAmount: number;
-  category: string;
+  description: string;
+  estimatedAmount: number;
+  beneficiaryCategory: string;
   duration: string;
-  submittedBy: string;
-  submittedDate: string;
+  status: string;
+  createdAt: string;
+  createdBy?: {
+    id: number;
+    name: string;
+    email: string;
+  };
   documents: number;
-  priority: 'high' | 'medium' | 'low';
+  rejectionReason?: string;
 }
 
-const pendingAppeals: PendingAppeal[] = [
-  {
-    id: 'APP-2024-002',
-    title: 'Healthcare Equipment Purchase',
-    purpose: 'Medical equipment for community health center including X-ray machine, ultrasound, and diagnostic tools',
-    requestedAmount: 350000,
-    category: 'Healthcare',
-    duration: '6 months',
-    submittedBy: 'Amit Patel',
-    submittedDate: '2024-12-20',
-    documents: 5,
-    priority: 'high',
-  },
-  {
-    id: 'APP-2024-003',
-    title: 'Clean Water Project',
-    purpose: 'Installation of water purification systems in 5 villages benefiting approximately 2000 families',
-    requestedAmount: 450000,
-    category: 'Infrastructure',
-    duration: '9 months',
-    submittedBy: 'Rajesh Kumar',
-    submittedDate: '2024-12-22',
-    documents: 4,
-    priority: 'high',
-  },
-  {
-    id: 'APP-2024-007',
-    title: 'Digital Literacy Program',
-    purpose: 'Computer training and digital literacy workshops for youth in rural areas',
-    requestedAmount: 180000,
-    category: 'Education',
-    duration: '6 months',
-    submittedBy: 'Priya Sharma',
-    submittedDate: '2024-12-24',
-    documents: 3,
-    priority: 'medium',
-  },
-  {
-    id: 'APP-2024-008',
-    title: 'Organic Farming Initiative',
-    purpose: 'Training and resources for transitioning to organic farming methods',
-    requestedAmount: 280000,
-    category: 'Agriculture',
-    duration: '12 months',
-    submittedBy: 'Amit Patel',
-    submittedDate: '2024-12-26',
-    documents: 4,
-    priority: 'medium',
-  },
-];
-
 export default function ApprovalWorkflow({ user }: ApprovalWorkflowProps) {
+  const [appeals, setAppeals] = useState<PendingAppeal[]>([]);
   const [selectedAppeal, setSelectedAppeal] = useState<PendingAppeal | null>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
   const [approvedAmount, setApprovedAmount] = useState('');
   const [remarks, setRemarks] = useState('');
   const [conditions, setConditions] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+
+  // Fetch pending appeals on mount
+  useEffect(() => {
+    fetchPendingAppeals();
+  }, []);
+
+  const fetchPendingAppeals = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const response = await approvalAPI.getPendingApprovals();
+      console.log('Pending appeals:', response.data);
+      setAppeals(response.data);
+    } catch (err: any) {
+      console.error('Failed to fetch pending appeals:', err);
+      setError('Failed to load pending appeals. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleReview = (appeal: PendingAppeal) => {
     setSelectedAppeal(appeal);
-    setApprovedAmount(appeal.requestedAmount.toString());
+    setApprovedAmount(appeal.estimatedAmount.toString());
     setRemarks('');
     setConditions('');
+    setRejectionReason('');
   };
 
   const handleApproval = (action: 'approve' | 'reject') => {
-    setApprovalAction(action);
-    setShowApprovalModal(true);
+    // If clicking the same action button that's already active, validate and show modal
+    if (approvalAction === action) {
+      if (action === 'approve' && (!approvedAmount || parseFloat(approvedAmount) <= 0)) {
+        setError('Please enter a valid approved amount');
+        return;
+      } else if (action === 'reject' && !rejectionReason.trim()) {
+        setError('Please enter a rejection reason');
+        return;
+      }
+      // All validations passed, show modal
+      setError('');
+      setShowApprovalModal(true);
+    } else {
+      // First time clicking this action, just set the action state to show the form
+      setApprovalAction(action);
+      setError('');
+    }
   };
 
-  const handleConfirm = () => {
-    setShowApprovalModal(false);
-    setSelectedAppeal(null);
-  };
+  const handleConfirm = async () => {
+    if (!selectedAppeal) return;
 
-  const priorityConfig = {
-    high: 'bg-red-100 text-red-700',
-    medium: 'bg-orange-100 text-orange-700',
-    low: 'bg-blue-100 text-blue-700',
+    try {
+      setSubmitting(true);
+      setError('');
+
+      if (approvalAction === 'approve') {
+        console.log('Approving appeal:', selectedAppeal.id, 'Amount:', approvedAmount);
+        await approvalAPI.approveAppeal(selectedAppeal.id.toString(), {
+          approvedAmount: parseFloat(approvedAmount),
+          remarks,
+        });
+        console.log('Appeal approved successfully');
+      } else if (approvalAction === 'reject') {
+        console.log('Rejecting appeal:', selectedAppeal.id, 'Reason:', rejectionReason);
+        await approvalAPI.rejectAppeal(selectedAppeal.id.toString(), rejectionReason);
+        console.log('Appeal rejected successfully');
+      }
+
+      // Refresh the list
+      await fetchPendingAppeals();
+      
+      setShowApprovalModal(false);
+      setSelectedAppeal(null);
+      setApprovalAction('approve');
+      setApprovedAmount('');
+      setRemarks('');
+      setRejectionReason('');
+    } catch (err: any) {
+      console.error('Failed to process approval:', err);
+      setError(err.response?.data?.message || 'Failed to process request. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div className="space-y-6">
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+          <div>{error}</div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -111,7 +141,7 @@ export default function ApprovalWorkflow({ user }: ApprovalWorkflowProps) {
         </div>
         <div className="flex items-center gap-4">
           <div className="px-4 py-2 bg-orange-100 text-orange-700 rounded-lg">
-            {pendingAppeals.length} Pending Reviews
+            {appeals.length} Pending Reviews
           </div>
         </div>
       </div>
@@ -123,28 +153,28 @@ export default function ApprovalWorkflow({ user }: ApprovalWorkflowProps) {
             <Clock className="w-5 h-5 text-orange-600" />
             <span className="text-gray-600">Pending</span>
           </div>
-          <div className="text-gray-900">4 Appeals</div>
+          <div className="text-gray-900">{appeals.length} Appeals</div>
         </div>
         <div className="bg-white rounded-xl p-6 border border-gray-200">
           <div className="flex items-center gap-3 mb-2">
             <CheckCircle className="w-5 h-5 text-green-600" />
-            <span className="text-gray-600">Approved This Month</span>
+            <span className="text-gray-600">Total Requested</span>
           </div>
-          <div className="text-gray-900">12 Appeals</div>
+          <div className="text-gray-900">₹{(appeals.reduce((sum, a) => sum + a.estimatedAmount, 0) / 100000).toFixed(1)}L</div>
         </div>
         <div className="bg-white rounded-xl p-6 border border-gray-200">
           <div className="flex items-center gap-3 mb-2">
             <DollarSign className="w-5 h-5 text-blue-600" />
-            <span className="text-gray-600">Total Amount</span>
+            <span className="text-gray-600">Avg Amount</span>
           </div>
-          <div className="text-gray-900">₹12.6L</div>
+          <div className="text-gray-900">₹{(appeals.length > 0 ? appeals.reduce((sum, a) => sum + a.estimatedAmount, 0) / appeals.length : 0).toLocaleString()}</div>
         </div>
         <div className="bg-white rounded-xl p-6 border border-gray-200">
           <div className="flex items-center gap-3 mb-2">
             <FileText className="w-5 h-5 text-purple-600" />
-            <span className="text-gray-600">Avg. Review Time</span>
+            <span className="text-gray-600">Total Documents</span>
           </div>
-          <div className="text-gray-900">2.3 days</div>
+          <div className="text-gray-900">{appeals.reduce((sum, a) => sum + a.documents, 0)} files</div>
         </div>
       </div>
 
@@ -153,31 +183,39 @@ export default function ApprovalWorkflow({ user }: ApprovalWorkflowProps) {
         <div className="lg:col-span-1 space-y-4">
           <div className="bg-white rounded-xl p-4 border border-gray-200">
             <div className="text-gray-900 mb-4">Pending Appeals</div>
-            <div className="space-y-3">
-              {pendingAppeals.map((appeal) => (
-                <div
-                  key={appeal.id}
-                  onClick={() => handleReview(appeal)}
-                  className={`p-4 border rounded-lg cursor-pointer transition-all hover:shadow-md ${
-                    selectedAppeal?.id === appeal.id
-                      ? 'border-green-500 bg-green-50'
-                      : 'border-gray-200 hover:border-green-300'
-                  }`}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="text-gray-900 line-clamp-1">{appeal.title}</div>
-                    <div className={`px-2 py-1 rounded text-xs ${priorityConfig[appeal.priority]}`}>
-                      {appeal.priority}
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+              </div>
+            ) : appeals.length === 0 ? (
+              <div className="text-center py-8">
+                <Clock className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                <p className="text-gray-500">No pending appeals</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {appeals.map((appeal) => (
+                  <div
+                    key={appeal.id}
+                    onClick={() => handleReview(appeal)}
+                    className={`p-4 border rounded-lg cursor-pointer transition-all hover:shadow-md ${
+                      selectedAppeal?.id === appeal.id
+                        ? 'border-green-500 bg-green-50'
+                        : 'border-gray-200 hover:border-green-300'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="text-gray-900 line-clamp-1 text-sm">{appeal.title}</div>
+                    </div>
+                    <div className="text-gray-500 text-xs mb-2">#{appeal.id}</div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600 text-sm">₹{(appeal.estimatedAmount / 1000).toFixed(0)}K</span>
+                      <span className="text-gray-500 text-xs">{new Date(appeal.createdAt).toLocaleDateString()}</span>
                     </div>
                   </div>
-                  <div className="text-gray-500 mb-2">{appeal.id}</div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600">₹{(appeal.requestedAmount / 1000).toFixed(0)}K</span>
-                    <span className="text-gray-500">{appeal.submittedDate}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -189,9 +227,9 @@ export default function ApprovalWorkflow({ user }: ApprovalWorkflowProps) {
               <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-6">
                 <div className="text-white mb-2">{selectedAppeal.title}</div>
                 <div className="flex items-center gap-4 text-green-100">
-                  <span>{selectedAppeal.id}</span>
+                  <span>#{selectedAppeal.id}</span>
                   <span>•</span>
-                  <span>{selectedAppeal.category}</span>
+                  <span>{selectedAppeal.beneficiaryCategory}</span>
                 </div>
               </div>
 
@@ -202,14 +240,14 @@ export default function ApprovalWorkflow({ user }: ApprovalWorkflowProps) {
                     <div className="text-gray-500 mb-1">Submitted By</div>
                     <div className="flex items-center gap-2">
                       <UserIcon className="w-4 h-4 text-gray-400" />
-                      <span className="text-gray-900">{selectedAppeal.submittedBy}</span>
+                      <span className="text-gray-900">{selectedAppeal.createdBy?.name || 'Unknown'}</span>
                     </div>
                   </div>
                   <div>
                     <div className="text-gray-500 mb-1">Submitted Date</div>
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-gray-400" />
-                      <span className="text-gray-900">{selectedAppeal.submittedDate}</span>
+                      <span className="text-gray-900">{new Date(selectedAppeal.createdAt).toLocaleDateString()}</span>
                     </div>
                   </div>
                   <div>
@@ -225,50 +263,67 @@ export default function ApprovalWorkflow({ user }: ApprovalWorkflowProps) {
                 {/* Purpose */}
                 <div>
                   <div className="text-gray-700 mb-2">Purpose & Description</div>
-                  <p className="text-gray-600 leading-relaxed">{selectedAppeal.purpose}</p>
+                  <p className="text-gray-600 leading-relaxed">{selectedAppeal.description}</p>
                 </div>
 
                 {/* Amount Requested */}
                 <div className="bg-blue-50 rounded-lg p-4">
                   <div className="text-gray-700 mb-1">Requested Amount</div>
-                  <div className="text-gray-900">₹{selectedAppeal.requestedAmount.toLocaleString()}</div>
+                  <div className="text-gray-900">₹{selectedAppeal.estimatedAmount.toLocaleString()}</div>
                 </div>
+
+                {/* Rejection Reason - Show if appeal is rejected */}
+                {selectedAppeal.status === 'REJECTED' && selectedAppeal.rejectionReason && (
+                  <div className="bg-red-50 rounded-lg p-4 border border-red-200">
+                    <div className="text-red-700 mb-2 font-medium">Rejection Reason</div>
+                    <div className="text-gray-700">{selectedAppeal.rejectionReason}</div>
+                  </div>
+                )}
 
                 {/* Approval Form */}
                 <div className="space-y-4 pt-4 border-t border-gray-200">
-                  <div>
-                    <label className="block text-gray-700 mb-2">Approved Amount (₹) *</label>
-                    <input
-                      type="number"
-                      value={approvedAmount}
-                      onChange={(e) => setApprovedAmount(e.target.value)}
-                      placeholder="Enter approved amount"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <p className="text-gray-500 mt-1">You can approve a different amount than requested</p>
-                  </div>
+                  {/* Always show rejection reason if action is reject */}
+                  {approvalAction === 'reject' && (
+                    <div>
+                      <label className="block text-gray-700 mb-2">Rejection Reason *</label>
+                      <textarea
+                        rows={4}
+                        value={rejectionReason}
+                        onChange={(e) => setRejectionReason(e.target.value)}
+                        placeholder="Please provide a reason for rejection..."
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                      />
+                      <p className="text-gray-500 mt-1 text-sm">This reason will be communicated to the applicant</p>
+                    </div>
+                  )}
 
-                  <div>
-                    <label className="block text-gray-700 mb-2">Approval Remarks</label>
-                    <textarea
-                      rows={3}
-                      value={remarks}
-                      onChange={(e) => setRemarks(e.target.value)}
-                      placeholder="Enter your remarks or feedback..."
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                  </div>
+                  {/* Approve form fields */}
+                  {approvalAction === 'approve' && (
+                    <>
+                      <div>
+                        <label className="block text-gray-700 mb-2">Approved Amount (₹) *</label>
+                        <input
+                          type="number"
+                          value={approvedAmount}
+                          onChange={(e) => setApprovedAmount(e.target.value)}
+                          placeholder="Enter approved amount"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                        <p className="text-gray-500 mt-1">You can approve a different amount than requested</p>
+                      </div>
 
-                  <div>
-                    <label className="block text-gray-700 mb-2">Conditions (if any)</label>
-                    <textarea
-                      rows={2}
-                      value={conditions}
-                      onChange={(e) => setConditions(e.target.value)}
-                      placeholder="Special conditions or requirements..."
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                  </div>
+                      <div>
+                        <label className="block text-gray-700 mb-2">Approval Remarks</label>
+                        <textarea
+                          rows={3}
+                          value={remarks}
+                          onChange={(e) => setRemarks(e.target.value)}
+                          placeholder="Enter your remarks or feedback..."
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Action Buttons */}
@@ -329,7 +384,7 @@ export default function ApprovalWorkflow({ user }: ApprovalWorkflowProps) {
               <div className="bg-gray-50 rounded-lg p-4 mb-6 space-y-2">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Appeal ID:</span>
-                  <span className="text-gray-900">{selectedAppeal?.id}</span>
+                  <span className="text-gray-900">#{selectedAppeal?.id}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Approved Amount:</span>
@@ -341,19 +396,21 @@ export default function ApprovalWorkflow({ user }: ApprovalWorkflowProps) {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowApprovalModal(false)}
-                className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                disabled={submitting}
+                className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirm}
-                className={`flex-1 px-6 py-3 rounded-lg transition-colors ${
+                disabled={submitting}
+                className={`flex-1 px-6 py-3 rounded-lg transition-colors disabled:opacity-50 ${
                   approvalAction === 'approve'
                     ? 'bg-green-600 text-white hover:bg-green-700'
                     : 'bg-red-600 text-white hover:bg-red-700'
                 }`}
               >
-                {approvalAction === 'approve' ? 'Confirm Approval' : 'Confirm Rejection'}
+                {submitting ? 'Processing...' : approvalAction === 'approve' ? 'Confirm Approval' : 'Confirm Rejection'}
               </button>
             </div>
           </div>

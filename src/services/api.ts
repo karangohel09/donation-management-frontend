@@ -122,32 +122,28 @@ export const appealAPI = {
     apiClient.post(`/appeals/${id}/documents`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+  getAppealDocuments: (id: string) => apiClient.get(`/appeals/${id}/documents`),
 };
 
 // ============================================
 // APPROVAL WORKFLOW APIs
 // ============================================
+// APPROVAL WORKFLOW APIs
+// ============================================
 
 export const approvalAPI = {
-  // GET /approvals/pending
   getPendingApprovals: () =>
     apiClient.get('/approvals/pending'),
 
-  // GET /approvals/history
-  getApprovalHistory: () =>
-    apiClient.get('/approvals/history'),
-
-  // POST /approvals/:appealId/approve
-  // Body: { approvedAmount, remarks, conditions }
-  approveAppeal: (appealId: string, data: { approvedAmount: number; remarks?: string; conditions?: string }) =>
+  approveAppeal: (appealId: string, data: { approvedAmount: number; remarks?: string }) =>
     apiClient.post(`/approvals/${appealId}/approve`, data),
 
-  // POST /approvals/:appealId/reject
-  // Body: { reason }
   rejectAppeal: (appealId: string, reason: string) =>
     apiClient.post(`/approvals/${appealId}/reject`, { reason }),
 
-  // GET /approvals/stats
+  getApprovalHistory: () =>
+    apiClient.get('/approvals/history'),
+
   getApprovalStats: () =>
     apiClient.get('/approvals/stats'),
 };
