@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from '../App';
-import { Mail, MessageCircle, Send, History, FileText, Users, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { Mail, MessageCircle, Send, History, FileText, Users, CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react';
+import { communicationAPI } from '../services/api';
 
 interface DonorCommunicationProps {
   user: User;
@@ -16,6 +17,19 @@ interface CommunicationHistory {
   sentBy: string;
   sentDate: string;
   message: string;
+}
+
+interface AutoTriggeredCommunication {
+  id: string;
+  appealId: string;
+  appealTitle: string;
+  triggerType: 'approval' | 'rejection' | 'status_update';
+  channels: ('email' | 'whatsapp' | 'postal')[];
+  recipientCount: number;
+  sentDate: string;
+  status: 'sent' | 'pending' | 'failed';
+  approverName?: string;
+  approvedAmount?: number;
 }
 
 const communicationHistory: CommunicationHistory[] = [
@@ -76,14 +90,38 @@ const templates = [
 ];
 
 export default function DonorCommunication({ user }: DonorCommunicationProps) {
-  const [activeTab, setActiveTab] = useState<'compose' | 'history'>('compose');
+  const [activeTab, setActiveTab] = useState<'compose' | 'history' | 'auto-triggered'>('compose');
   const [selectedAppeal, setSelectedAppeal] = useState('');
   const [selectedChannel, setSelectedChannel] = useState<'whatsapp' | 'email' | 'postal'>('email');
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
+  const [autoTriggeredComms, setAutoTriggeredComms] = useState<AutoTriggeredCommunication[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const isReadOnly = user.role === 'viewer';
+
+  // Load auto-triggered communications
+  useEffect(() => {
+    if (activeTab === 'auto-triggered') {
+      loadAutoTriggeredCommunications();
+    }
+  }, [activeTab]);
+
+  const loadAutoTriggeredCommunications = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const response = await communicationAPI.getAutoTriggeredCommunications();
+      setAutoTriggeredComms(response.data || []);
+    } catch (err: any) {
+      console.error('Failed to load auto-triggered communications:', err);
+      setError('Failed to load auto-triggered communications');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleTemplateSelect = (templateId: string) => {
     const template = templates.find(t => t.id.toString() === templateId);
@@ -173,6 +211,17 @@ export default function DonorCommunication({ user }: DonorCommunicationProps) {
             >
               <History className="w-5 h-5" />
               Communication History
+            </button>
+            <button
+              onClick={() => setActiveTab('auto-triggered')}
+              className={`flex-1 px-6 py-4 flex items-center justify-center gap-2 transition-colors ${
+                activeTab === 'auto-triggered'
+                  ? 'bg-green-50 text-green-700 border-b-2 border-green-600'
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <AlertCircle className="w-5 h-5" />
+              Auto-Triggered
             </button>
           </div>
         </div>
@@ -356,6 +405,90 @@ export default function DonorCommunication({ user }: DonorCommunicationProps) {
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* Auto-Triggered Communications Tab */}
+        {activeTab === 'auto-triggered' && (
+          <div className="p-6">
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start gap-3 mb-6">
+                <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                <div>{error}</div>
+              </div>
+            )}
+
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+              </div>
+            ) : autoTriggeredComms.length === 0 ? (
+              <div className="text-center py-12">
+                <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                <p className="text-gray-500">No auto-triggered communications yet</p>
+                <p className="text-gray-400 text-sm mt-1">Communications will appear here when appeals are approved or rejected</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {autoTriggeredComms.map((comm) => {
+                  const StatusIcon = statusConfig[comm.status].icon;
+                  const triggerLabels: Record<string, { label: string; color: string }> = {
+                    approval: { label: 'Approval Notification', color: 'bg-green-100 text-green-700' },
+                    rejection: { label: 'Rejection Notification', color: 'bg-red-100 text-red-700' },
+                    status_update: { label: 'Status Update', color: 'bg-blue-100 text-blue-700' },
+                  };
+
+                  const triggerInfo = triggerLabels[comm.triggerType];
+
+                  return (
+                    <div key={comm.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="text-gray-900 font-medium">{comm.appealTitle}</div>
+                            <div className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-sm">
+                              {comm.appealId}
+                            </div>
+                            <div className={`px-2 py-1 rounded text-sm font-medium ${triggerInfo.color}`}>
+                              {triggerInfo.label}
+                            </div>
+                          </div>
+                          
+                          {comm.triggerType === 'approval' && comm.approvedAmount && (
+                            <div className="text-gray-600 text-sm mb-2">
+                              Approved Amount: <span className="font-semibold text-green-600">₹{comm.approvedAmount.toLocaleString()}</span>
+                              {comm.approverName && <span> by {comm.approverName}</span>}
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-4 text-gray-600 text-sm">
+                            <span className="flex items-center gap-1">
+                              <Users className="w-4 h-4" />
+                              {comm.recipientCount} recipients
+                            </span>
+                            <span>•</span>
+                            <span className="flex items-center gap-1">
+                              {comm.channels.length > 1 ? (
+                                <>Multiple channels: {comm.channels.join(', ')}</>
+                              ) : (
+                                comm.channels[0] && channelIcons[comm.channels[0] as 'email' | 'whatsapp' | 'postal']
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className={`px-3 py-1 rounded-full inline-flex items-center gap-2 mb-2 ${statusConfig[comm.status].color}`}>
+                            <StatusIcon className="w-4 h-4" />
+                            <span className="capitalize">{comm.status}</span>
+                          </div>
+                          <div className="text-gray-500 text-sm">{comm.sentDate}</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>

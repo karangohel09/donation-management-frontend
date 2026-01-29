@@ -100,6 +100,10 @@ export default function ApprovalWorkflow({ user }: ApprovalWorkflowProps) {
           remarks,
         });
         console.log('Appeal approved successfully');
+        
+        // Show success notification about donor communication
+        const successMessage = `✓ Appeal Approved Successfully!\n\nDonors will be automatically notified via:\n• Email\n• WhatsApp (if available)`;
+        alert(successMessage);
       } else if (approvalAction === 'reject') {
         console.log('Rejecting appeal:', selectedAppeal.id, 'Reason:', rejectionReason);
         await approvalAPI.rejectAppeal(selectedAppeal.id.toString(), rejectionReason);
@@ -381,16 +385,36 @@ export default function ApprovalWorkflow({ user }: ApprovalWorkflowProps) {
             </p>
 
             {approvalAction === 'approve' && (
-              <div className="bg-gray-50 rounded-lg p-4 mb-6 space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Appeal ID:</span>
-                  <span className="text-gray-900">#{selectedAppeal?.id}</span>
+              <>
+                <div className="bg-gray-50 rounded-lg p-4 mb-6 space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Appeal ID:</span>
+                    <span className="text-gray-900">#{selectedAppeal?.id}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Approved Amount:</span>
+                    <span className="text-green-600">₹{parseInt(approvedAmount).toLocaleString()}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Approved Amount:</span>
-                  <span className="text-green-600">₹{parseInt(approvedAmount).toLocaleString()}</span>
+                
+                {/* Donor Notification Info */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                  <div className="flex items-start gap-3">
+                    <MessageSquare className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium text-blue-900 mb-2">Automatic Donor Notification</p>
+                      <p className="text-sm text-blue-700 mb-3">
+                        Upon approval, all associated donors will receive automatic notifications:
+                      </p>
+                      <ul className="text-sm text-blue-700 space-y-1">
+                        <li>✓ Email notification with approval details</li>
+                        <li>✓ WhatsApp message (if phone number available)</li>
+                        <li>✓ All communications will be logged for audit trail</li>
+                      </ul>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </>
             )}
 
             <div className="flex gap-3">
