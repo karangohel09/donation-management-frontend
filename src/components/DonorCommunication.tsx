@@ -1,22 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { User } from '../App';
-import { Mail, MessageCircle, Send, History, FileText, Users, CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react';
-import { communicationAPI } from '../services/api';
+import { Mail, MessageCircle, Send, History, FileText, Users, CheckCircle, Clock, XCircle, AlertCircle, TrendingUp } from 'lucide-react';
+import { communicationAPI, appealAPI } from '../services/api';
 
 interface DonorCommunicationProps {
   user: User;
 }
 
-interface CommunicationHistory {
-  id: string;
-  appealId: string;
-  appealTitle: string;
-  channel: 'whatsapp' | 'email' | 'postal';
-  recipients: number;
-  status: 'sent' | 'pending' | 'failed';
-  sentBy: string;
-  sentDate: string;
-  message: string;
+interface Appeal {
+  id: number;
+  title: string;
+  description: string;
+  estimatedAmount: number;
+  approvedAmount?: number;
+  status: string;
+  createdAt: string;
 }
 
 interface AutoTriggeredCommunication {
@@ -24,7 +22,7 @@ interface AutoTriggeredCommunication {
   appealId: string;
   appealTitle: string;
   triggerType: 'approval' | 'rejection' | 'status_update';
-  channels: ('email' | 'whatsapp' | 'postal')[];
+  channels: string[];
   recipientCount: number;
   sentDate: string;
   status: 'sent' | 'pending' | 'failed';
@@ -32,60 +30,19 @@ interface AutoTriggeredCommunication {
   approvedAmount?: number;
 }
 
-const communicationHistory: CommunicationHistory[] = [
-  {
-    id: 'COM-001',
-    appealId: 'APP-2024-001',
-    appealTitle: 'Education Support Program 2024',
-    channel: 'email',
-    recipients: 145,
-    status: 'sent',
-    sentBy: 'Priya Sharma',
-    sentDate: '2024-12-27 10:30 AM',
-    message: 'Thank you for your generous support...',
-  },
-  {
-    id: 'COM-002',
-    appealId: 'APP-2024-005',
-    appealTitle: 'Rural Infrastructure Development',
-    channel: 'whatsapp',
-    recipients: 89,
-    status: 'sent',
-    sentBy: 'Rajesh Kumar',
-    sentDate: '2024-12-26 02:15 PM',
-    message: 'We are pleased to inform you...',
-  },
-  {
-    id: 'COM-003',
-    appealId: 'APP-2024-001',
-    appealTitle: 'Education Support Program 2024',
-    channel: 'postal',
-    recipients: 23,
-    status: 'pending',
-    sentBy: 'Priya Sharma',
-    sentDate: '2024-12-25 09:00 AM',
-    message: 'Official acknowledgment letter...',
-  },
-];
-
+// Templates for quick composition
 const templates = [
   {
     id: 1,
-    name: 'Donation Thank You',
-    subject: 'Thank You for Your Generous Donation',
-    content: 'Dear [Donor Name],\n\nWe are deeply grateful for your generous donation of ₹[Amount] to support [Appeal Title].\n\nYour contribution will make a significant difference in the lives of [Beneficiaries].\n\nWith gratitude,\nITC × Anoopam Mission Team',
+    name: 'Approval Notification',
+    subject: 'Great News! Your Appeal is Approved',
+    content: 'Dear Valued Donor,\n\nWe are delighted to inform you that your appeal has been officially approved.\n\nWe will now proceed with implementation and will keep you updated with regular progress reports.\n\nThank you for your generous support and trust in our mission.\n\nBest regards,\nITC × Anoopam Mission Team',
   },
   {
     id: 2,
-    name: 'Appeal Announcement',
-    subject: 'New Appeal: [Appeal Title]',
-    content: 'Dear [Donor Name],\n\nWe are excited to share a new initiative: [Appeal Title].\n\n[Appeal Description]\n\nWe invite you to be part of this meaningful journey.\n\nBest regards,\nITC × Anoopam Mission Team',
-  },
-  {
-    id: 3,
     name: 'Impact Update',
-    subject: 'Impact Report: Your Donation at Work',
-    content: 'Dear [Donor Name],\n\nWe are pleased to share the impact of your donation:\n\n[Impact Details]\n\nThank you for making this possible.\n\nWarm regards,\nITC × Anoopam Mission Team',
+    subject: 'Impact Report: Your Contribution at Work',
+    content: 'Dear Valued Donor,\n\nWe are pleased to share the positive impact of your contribution:\n\n[Impact Details]\n\nYour generous support has made a meaningful difference in the lives of many.\n\nThank you for being part of our mission.\n\nWarm regards,\nITC × Anoopam Mission Team',
   },
 ];
 
@@ -97,10 +54,33 @@ export default function DonorCommunication({ user }: DonorCommunicationProps) {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [autoTriggeredComms, setAutoTriggeredComms] = useState<AutoTriggeredCommunication[]>([]);
+  const [appeals, setAppeals] = useState<Appeal[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
-  const isReadOnly = user.role === 'viewer';
+  const isReadOnly = user.role === 'viewer' || user.role === 'DONOR';
+  
+  // Load appeals and communications on component mount
+  useEffect(() => {
+    loadAppeals();
+    loadAutoTriggeredCommunications();
+  }, []);
+  
+  const loadAppeals = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const response = await appealAPI.getAppeals({ status: 'all', page: 1, limit: 100 });
+      console.log('Loaded appeals:', response.data);
+      setAppeals(response.data || []);
+    } catch (err: any) {
+      console.error('Error loading appeals:', err);
+      setError('Failed to load appeals: ' + (err.response?.status || err.message));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Load auto-triggered communications
   useEffect(() => {
@@ -114,10 +94,60 @@ export default function DonorCommunication({ user }: DonorCommunicationProps) {
       setLoading(true);
       setError('');
       const response = await communicationAPI.getAutoTriggeredCommunications();
+      console.log('Auto-triggered communications loaded:', response.data);
       setAutoTriggeredComms(response.data || []);
     } catch (err: any) {
-      console.error('Failed to load auto-triggered communications:', err);
-      setError('Failed to load auto-triggered communications');
+      console.error('Failed to load auto-triggered communications:', {
+        message: err.message,
+        status: err.response?.status,
+        data: err.response?.data,
+        url: err.config?.url
+      });
+      setError(`Failed to load auto-triggered communications: ${err.response?.status || err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleSendCommunication = async () => {
+    if (!selectedAppeal) {
+      setError('Please select an appeal');
+      return;
+    }
+    
+    if (!message.trim()) {
+      setError('Please compose a message');
+      return;
+    }
+    
+    if (selectedChannel === 'email' && !subject.trim()) {
+      setError('Please enter an email subject');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      const response = await communicationAPI.sendCommunication({
+        appealId: parseInt(selectedAppeal),
+        channel: selectedChannel.toUpperCase(),
+        subject: subject || 'Communication',
+        message: message,
+        recipientType: 'DONORS'
+      });
+      
+      console.log('Communication sent successfully:', response.data);
+      setSuccessMessage('Communication sent successfully!');
+      setSelectedAppeal('');
+      setSubject('');
+      setMessage('');
+      setSelectedTemplate('');
+      
+      setTimeout(() => setSuccessMessage(''), 3000);
+      loadAutoTriggeredCommunications();
+    } catch (err: any) {
+      console.error('Failed to send communication:', err);
+      setError(err.response?.data?.message || 'Failed to send communication: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -161,28 +191,36 @@ export default function DonorCommunication({ user }: DonorCommunicationProps) {
             <Mail className="w-5 h-5 text-blue-600" />
             <span className="text-gray-600">Email Sent</span>
           </div>
-          <div className="text-gray-900">145</div>
+          <div className="text-gray-900 text-2xl font-bold">
+            {autoTriggeredComms.filter(c => c.channel === 'EMAIL').length}
+          </div>
         </div>
         <div className="bg-white rounded-xl p-6 border border-gray-200">
           <div className="flex items-center gap-3 mb-2">
             <MessageCircle className="w-5 h-5 text-green-600" />
             <span className="text-gray-600">WhatsApp Sent</span>
           </div>
-          <div className="text-gray-900">89</div>
+          <div className="text-gray-900 text-2xl font-bold">
+            {autoTriggeredComms.filter(c => c.channel === 'WHATSAPP').length}
+          </div>
         </div>
         <div className="bg-white rounded-xl p-6 border border-gray-200">
           <div className="flex items-center gap-3 mb-2">
             <Send className="w-5 h-5 text-purple-600" />
-            <span className="text-gray-600">Postal Mail</span>
+            <span className="text-gray-600">Failed</span>
           </div>
-          <div className="text-gray-900">23</div>
+          <div className="text-gray-900 text-2xl font-bold">
+            {autoTriggeredComms.filter(c => c.status === 'failed').length}
+          </div>
         </div>
         <div className="bg-white rounded-xl p-6 border border-gray-200">
           <div className="flex items-center gap-3 mb-2">
             <Users className="w-5 h-5 text-orange-600" />
             <span className="text-gray-600">Total Recipients</span>
           </div>
-          <div className="text-gray-900">257</div>
+          <div className="text-gray-900 text-2xl font-bold">
+            {autoTriggeredComms.reduce((sum, c) => sum + (c.recipientCount || 0), 0)}
+          </div>
         </div>
       </div>
 
@@ -239,10 +277,37 @@ export default function DonorCommunication({ user }: DonorCommunicationProps) {
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
               >
                 <option value="">Choose an appeal</option>
-                <option value="APP-2024-001">Education Support Program 2024</option>
-                <option value="APP-2024-005">Rural Infrastructure Development</option>
-                <option value="APP-2024-002">Healthcare Equipment Purchase</option>
+                {appeals.map((appeal) => (
+                  <option key={appeal.id} value={appeal.id}>
+                    {appeal.title} (Status: {appeal.status})
+                  </option>
+                ))}
               </select>
+              {selectedAppeal && (
+                <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  {(() => {
+                    const appeal = appeals.find(a => a.id.toString() === selectedAppeal);
+                    return appeal ? (
+                      <>
+                        <p className="font-semibold text-blue-900">{appeal.title}</p>
+                        <p className="text-sm text-blue-700 mt-1">{appeal.description}</p>
+                        <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
+                          <div>
+                            <span className="text-blue-600">Estimated:</span>
+                            <span className="ml-2 font-semibold">₹{appeal.estimatedAmount?.toLocaleString() || 'N/A'}</span>
+                          </div>
+                          {appeal.approvedAmount && (
+                            <div>
+                              <span className="text-blue-600">Approved:</span>
+                              <span className="ml-2 font-semibold">₹{appeal.approvedAmount.toLocaleString()}</span>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    ) : null;
+                  })()}
+                </div>
+              )}
             </div>
 
             {/* Channel Selection */}
@@ -353,13 +418,36 @@ export default function DonorCommunication({ user }: DonorCommunicationProps) {
             {/* Actions */}
             {!isReadOnly && (
               <div className="flex gap-3 pt-4">
-                <button className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-                  Save as Draft
+                <button 
+                  onClick={() => {
+                    setMessage('');
+                    setSubject('');
+                    setSelectedAppeal('');
+                  }}
+                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                  Clear
                 </button>
-                <button className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2">
+                <button 
+                  onClick={handleSendCommunication}
+                  disabled={loading || !selectedAppeal || !message.trim()}
+                  className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                   <Send className="w-5 h-5" />
-                  Send Communication
+                  {loading ? 'Sending...' : 'Send Communication'}
                 </button>
+              </div>
+            )}
+            
+            {/* Messages */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                <div>{error}</div>
+              </div>
+            )}
+            {successMessage && (
+              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-start gap-3">
+                <CheckCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                <div>{successMessage}</div>
               </div>
             )}
           </div>
@@ -368,43 +456,43 @@ export default function DonorCommunication({ user }: DonorCommunicationProps) {
         {/* History Tab */}
         {activeTab === 'history' && (
           <div className="p-6">
-            <div className="space-y-4">
-              {communicationHistory.map((comm) => {
-                const StatusIcon = statusConfig[comm.status].icon;
-                return (
-                  <div key={comm.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="text-gray-900">{comm.appealTitle}</div>
-                          <div className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-sm">
-                            {comm.appealId}
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+              </div>
+            ) : autoTriggeredComms.length === 0 ? (
+              <div className="text-center py-12">
+                <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                <p className="text-gray-500">No communications sent yet</p>
+                <p className="text-gray-400 text-sm mt-1">Compose a new message to send to donors</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {autoTriggeredComms.map((comm) => {
+                  const StatusIcon = statusConfig[comm.status.toLowerCase() as keyof typeof statusConfig]?.icon || CheckCircle;
+                  return (
+                    <div key={comm.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-gray-900">{comm.appealTitle}</h4>
+                          <p className="text-sm text-gray-600 mt-1">
+                            Sent to {comm.recipientCount} recipient{comm.recipientCount !== 1 ? 's' : ''} via {comm.channels?.join(', ') || 'Email'}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-2">
+                            {new Date(comm.sentDate).toLocaleDateString()} at {new Date(comm.sentDate).toLocaleTimeString()}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <div className={`px-3 py-1 rounded-full text-sm font-medium ${statusConfig[comm.status.toLowerCase() as keyof typeof statusConfig]?.color || 'bg-gray-100 text-gray-700'}`}>
+                            {comm.status.toUpperCase()}
                           </div>
                         </div>
-                        <div className="text-gray-500 mb-2">{comm.message}</div>
-                        <div className="flex items-center gap-4 text-gray-600">
-                          <span className="flex items-center gap-1">
-                            {channelIcons[comm.channel]}
-                            <span className="capitalize">{comm.channel}</span>
-                          </span>
-                          <span>•</span>
-                          <span>{comm.recipients} recipients</span>
-                          <span>•</span>
-                          <span>By {comm.sentBy}</span>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className={`px-3 py-1 rounded-full inline-flex items-center gap-2 mb-2 ${statusConfig[comm.status].color}`}>
-                          <StatusIcon className="w-4 h-4" />
-                          <span className="capitalize">{comm.status}</span>
-                        </div>
-                        <div className="text-gray-500">{comm.sentDate}</div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 

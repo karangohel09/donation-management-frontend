@@ -4,6 +4,7 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import AppealManagement from './components/AppealManagement';
 import ApprovalWorkflow from './components/ApprovalWorkflow';
+import DonorManagement from './components/DonorManagement';
 import DonorCommunication from './components/DonorCommunication';
 import DonationReceipt from './components/DonationReceipt';
 import FundUtilization from './components/FundUtilization';
@@ -158,6 +159,7 @@ function App() {
             <Route path="/dashboard" element={<Dashboard user={currentUser!} />} />
             <Route path="/appeals" element={<AppealManagement user={currentUser!} />} />
             <Route path="/approvals" element={<ApprovalWorkflow user={currentUser!} />} />
+            <Route path="/donors" element={<DonorManagement user={currentUser!} />} />
             <Route path="/communication" element={<DonorCommunication user={currentUser!} />} />
             <Route path="/donations" element={<DonationReceipt user={currentUser!} />} />
             <Route path="/utilization" element={<FundUtilization user={currentUser!} />} />

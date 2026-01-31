@@ -31,6 +31,7 @@ const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['SUPER_ADMIN', 'ITC_ADMIN', 'MISSION_ADMIN', 'FINANCE_ADMIN', 'VIEWER'] },
   { id: 'appeals', label: 'Appeal Management', icon: FileText, roles: ['SUPER_ADMIN', 'ITC_ADMIN', 'MISSION_ADMIN'] },
   { id: 'approvals', label: 'Approval Workflow', icon: CheckCircle, roles: ['SUPER_ADMIN', 'MISSION_ADMIN', 'FINANCE_ADMIN'] },
+  { id: 'donors', label: 'Donor Management', icon: Heart, roles: ['SUPER_ADMIN', 'ITC_ADMIN'] },
   { id: 'communication', label: 'Donor Communication', icon: MessageSquare, roles: ['SUPER_ADMIN', 'ITC_ADMIN'] },
   { id: 'donations', label: 'Donation Receipt', icon: Receipt, roles: ['SUPER_ADMIN', 'ITC_ADMIN', 'FINANCE_ADMIN'] },
   { id: 'utilization', label: 'Fund Utilization', icon: TrendingUp, roles: ['SUPER_ADMIN', 'ITC_ADMIN', 'FINANCE_ADMIN'] },

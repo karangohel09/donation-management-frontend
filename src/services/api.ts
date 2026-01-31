@@ -170,13 +170,13 @@ export const communicationAPI = {
   getStats: () =>
     apiClient.get('/communications/stats'),
 
-  // GET /communications/auto-triggered - Get auto-triggered communications (approval, rejection, etc.)
+  // GET /approvals/communications/auto-triggered - Get auto-triggered communications (approval, rejection, etc.)
   getAutoTriggeredCommunications: (params?: { triggerType?: string; page?: number; limit?: number }) =>
-    apiClient.get('/communications/auto-triggered', { params }),
+    apiClient.get('/approvals/communications/auto-triggered', { params }),
 
-  // GET /communications/auto-triggered/stats - Get auto-triggered communication statistics
+  // GET /approvals/communications/auto-triggered/stats - Get auto-triggered communication statistics
   getAutoTriggeredStats: () =>
-    apiClient.get('/communications/auto-triggered/stats'),
+    apiClient.get('/approvals/communications/auto-triggered/stats'),
 };
 
 // ============================================
