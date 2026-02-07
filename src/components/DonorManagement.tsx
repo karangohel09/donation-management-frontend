@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Mail, Phone, User, Search } from 'lucide-react';
 import { User as UserType } from '../App';
+import { donorAPI } from '../services/api';
 
 interface DonorManagementProps {
   user: UserType;
@@ -33,15 +34,8 @@ const DonorManagement: React.FC<DonorManagementProps> = ({ user }) => {
 
   const loadDonors = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/donors', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setDonors(data);
-      }
+      const response = await donorAPI.getAllDonors();
+      setDonors(response.data);
     } catch (error) {
       console.error('Error loading donors:', error);
     }
@@ -57,27 +51,15 @@ const DonorManagement: React.FC<DonorManagementProps> = ({ user }) => {
 
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8080/api/donors', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify(formData),
-      });
-
-      if (response.ok) {
-        setMessage('✓ Donor added successfully');
-        setFormData({ name: '', email: '', phoneNumber: '' });
-        setShowAddForm(false);
-        loadDonors();
-        setTimeout(() => setMessage(''), 3000);
-      } else {
-        setMessage('✗ Failed to add donor');
-      }
+      await donorAPI.createDonor(formData);
+      setMessage('✓ Donor added successfully');
+      setFormData({ name: '', email: '', phoneNumber: '' });
+      setShowAddForm(false);
+      loadDonors();
+      setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       console.error('Error adding donor:', error);
-      setMessage('✗ Error adding donor');
+      setMessage('✗ Failed to add donor');
     } finally {
       setLoading(false);
     }
@@ -87,23 +69,13 @@ const DonorManagement: React.FC<DonorManagementProps> = ({ user }) => {
     if (!confirm('Are you sure you want to delete this donor?')) return;
 
     try {
-      const response = await fetch(`http://localhost:8080/api/donors/${id}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-
-      if (response.ok) {
-        setMessage('✓ Donor deleted successfully');
-        loadDonors();
-        setTimeout(() => setMessage(''), 3000);
-      } else {
-        setMessage('✗ Failed to delete donor');
-      }
+      await donorAPI.deleteDonor(id);
+      setMessage('✓ Donor deleted successfully');
+      loadDonors();
+      setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       console.error('Error deleting donor:', error);
-      setMessage('✗ Error deleting donor');
+      setMessage('✗ Failed to delete donor');
     }
   };
 

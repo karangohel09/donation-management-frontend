@@ -21,6 +21,10 @@ public interface DonorAppealRepository extends JpaRepository<DonorAppeal, Long> 
     // Find all donors linked to an appeal
     @Query("SELECT da.donor FROM DonorAppeal da WHERE da.appeal.id = :appealId")
     List<Donor> findDonorsByAppealId(@Param("appealId") Long appealId);
+
+    // Find donors by donor ID
+    @Query("SELECT da.donor FROM DonorAppeal da WHERE da.donor.id = :donorId")
+    List<Donor> findDonorsByDonorId(@Param("donorId") Long donorId);
     
     // Check if a donor is linked to an appeal
     boolean existsByDonorIdAndAppealId(Long donorId, Long appealId);

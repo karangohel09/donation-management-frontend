@@ -1,9 +1,7 @@
 import axios from 'axios';
 import { authService } from './auth';
-// API Base URL - Use Vite proxy to avoid CORS issues
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || '/api';
-
+// API Base URL - Use environment variable or fall back to default
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
 // Create axios instance with default config
 const apiClient = axios.create({
@@ -184,31 +182,54 @@ export const communicationAPI = {
 // ============================================
 
 export const donationAPI = {
-  // GET /donations?status=all&search=&page=1&limit=10
-  getDonations: (params: { status?: string; search?: string; page?: number; limit?: number }) =>
-    apiClient.get('/donations', { params }),
-
-  // GET /donations/:id
-  getDonationById: (id: string) =>
-    apiClient.get(`/donations/${id}`),
-
-  // POST /donations
-  // Body: { donorName, donorEmail, donorPhone, appealId, amount, mode, chequeNumber?, chequeDate?, transactionRef?, receivingEntity }
-  recordDonation: (data: any) =>
+  // POST /donations - Create new donation
+  // Body: { donorId, appealId, amount, paymentMode, transactionId?, notes? }
+  createDonation: (data: any) =>
     apiClient.post('/donations', data),
 
-  // PUT /donations/:id
-  updateDonation: (id: string, data: any) =>
-    apiClient.put(`/donations/${id}`, data),
+  // GET /donations - Get all donations
+  getDonations: (params?: any) =>
+    apiClient.get('/donations', { params }),
 
-  // GET /donations/stats
-  getStats: () =>
-    apiClient.get('/donations/stats'),
+  // GET /donations/:id - Get donation by ID
+  getDonationById: (id: number | string) =>
+    apiClient.get(`/donations/${id}`),
 
-  // GET /donations/:id/receipt
-  // Response: PDF blob
-  downloadReceipt: (id: string) =>
-    apiClient.get(`/donations/${id}/receipt`, { responseType: 'blob' }),
+  // GET /donations/donor/:donorId - Get donations by donor
+  getDonationsByDonor: (donorId: number) =>
+    apiClient.get(`/donations/donor/${donorId}`),
+
+  // GET /donations/appeal/:appealId - Get donations by appeal
+  getDonationsByAppeal: (appealId: number) =>
+    apiClient.get(`/donations/appeal/${appealId}`),
+
+  // GET /donations/status/:status - Get donations by status (PENDING, CONFIRMED, FAILED)
+  getDonationsByStatus: (status: string) =>
+    apiClient.get(`/donations/status/${status}`),
+
+  // POST /donations/:id/confirm - Confirm a donation
+  confirmDonation: (id: number | string) =>
+    apiClient.post(`/donations/${id}/confirm`),
+
+  // POST /donations/:id/fail - Mark donation as failed
+  failDonation: (id: number | string) =>
+    apiClient.post(`/donations/${id}/fail`),
+
+  // POST /donations/:id/generate-receipt - Generate receipt for donation
+  generateReceipt: (id: number | string) =>
+    apiClient.post(`/donations/${id}/generate-receipt`),
+
+  // POST /donations/receipts/:receiptId/send-email - Send receipt via email
+  sendReceiptEmail: (receiptId: number) =>
+    apiClient.post(`/donations/receipts/${receiptId}/send-email`),
+
+  // GET /donations/pending-receipt - Get donations pending receipt
+  getDonationsPendingReceipt: () =>
+    apiClient.get('/donations/pending-receipt'),
+
+  // DELETE /donations/:id - Delete donation (only if PENDING)
+  deleteDonation: (id: number | string) =>
+    apiClient.delete(`/donations/${id}`),
 };
 
 // ============================================
@@ -267,6 +288,33 @@ export const assetAPI = {
   // GET /assets/stats
   getStats: () =>
     apiClient.get('/assets/stats'),
+};
+
+// ============================================
+// DONOR MANAGEMENT APIs
+// ============================================
+
+export const donorAPI = {
+  // GET /donors
+  getAllDonors: () =>
+    apiClient.get('/donors'),
+
+  // GET /donors/:id
+  getDonorById: (id: number) =>
+    apiClient.get(`/donors/${id}`),
+
+  // POST /donors
+  // Body: { name, email, phoneNumber }
+  createDonor: (data: any) =>
+    apiClient.post('/donors', data),
+
+  // PUT /donors/:id
+  updateDonor: (id: number, data: any) =>
+    apiClient.put(`/donors/${id}`, data),
+
+  // DELETE /donors/:id
+  deleteDonor: (id: number) =>
+    apiClient.delete(`/donors/${id}`),
 };
 
 // ============================================
